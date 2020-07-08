@@ -177,4 +177,8 @@ ggplot() +
 # Matrices 
 
 Q_estim <- apply(Q_mcmc[, , (0.5 * n_gibbs + 1):n_gibbs, drop = F], c(1,2), mean)
+Q_cond <- apply(Q_mcmc[, , (0.5 * n_gibbs + 1):n_gibbs, drop = F], c(3), det)
+
+plot(1:(0.5 *  n_gibbs), Q_cond, "l")
+Q_estim
 solve(Q_estim) - solve(Q_true)
