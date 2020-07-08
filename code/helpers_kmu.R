@@ -87,19 +87,28 @@ backwardsample_it <- function(D, S_m, b_m, N_m, nu, Q, lambda, n_T, k,
 # Hierarchical Bayes ==== 
 
 compute_G <- function(beta_0, theta, n_T, k){ 
-  beta = as.data.frame(t(theta[, 2:(k + 1)]))
-  beta_lag = as.data.frame(cbind(beta_0, beta[, 1:(n_T - 1)])) 
-  h = matrix(rep(t(theta[, 1]),k), nrow = k, 
-             ncol = n_T, byrow = TRUE)
-  beta_tilde = sqrt(h) * (beta - beta_lag) 
-  # maybe numerically not the smartest idea.  
-  matrix(apply(apply(beta_tilde,  2, function(x) x %*% t(x)), 1, sum), 
-         nrow = k, ncol = k)
+  beta <- t(theta[, 2:(k + 1)])
+  beta_lag <- cbind(beta_0, beta[, 1:(n_T - 1)])
+  h <- theta[, 1]
+  beta_tilde <- beta - beta_lag 
+  G <- matrix(0, ncol = k, nrow = k)
+  for (i in 1:n_T){
+    G <- G + h[i] * beta_tilde[, i] %*% t(beta_tilde[, i])
+  }
+  if (!isSymmetric(G)){
+    warning("A non-symmetric matrix was generated.")
+  }
+  return(G)
 } 
 
 sample_Q <- function(beta_0, theta, n_T, k, S0_inv){
   G_exp <- compute_G(beta_0, theta, n_T, k)
-  drop(rWishart(1, df = (n_T + k), Sigma = solve(G_exp + S0_inv)))
+  scale_W <- 1/(n_T) (G_exp + S0_inv)
+  cond <- kappa(scale_W)
+  if (cond > 10^6){
+    warning(print("The conditioning number is > 10^6."))
+  }
+  drop(rWishart(1, df = (n_T + k), Sigma = 1/(n_T) * solve(scale_W)))
 }
 
 logp_nu <- function(nu, h_T, h_0, k, lambda, n_T, alpha){
