@@ -103,7 +103,7 @@ compute_G <- function(beta_0, theta, n_T, k){
 
 sample_Q <- function(beta_0, theta, n_T, k, S0_inv){
   G_exp <- compute_G(beta_0, theta, n_T, k)
-  scale_W <- 1/(n_T) (G_exp + S0_inv)
+  scale_W <- 1/(n_T) * (G_exp + S0_inv)
   cond <- kappa(scale_W)
   if (cond > 10^6){
     warning(print("The conditioning number is > 10^6."))
