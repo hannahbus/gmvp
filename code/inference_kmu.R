@@ -15,105 +15,105 @@ library(plotly)
 
 setwd("~/Desktop/bayesian-gmvp/Computation/")
 
-set.seed(123)
-rm(list = ls())
-source("helpers_kmu.R")
-source("helpers_general.R")
-
-load("returns.Rda")
-n_max <- 2000 #nrow(returns)
-mcoptions <- list(preschedule = FALSE, set.seed= TRUE)
-
-# Prepping ====
-selection <- c("ba", "hd", "ko", "jpm", "ibm")
-selection <- c(setdiff(names(returns), "date")) 
-baseline <- "ba"
-df <- returns[1:n_max, names(returns) %in% selection]
-stocks <- c(setdiff(selection, "ba"))
-df[1:n_max, stocks] <- - returns[1:n_max, stocks] + returns[1:n_max, "ba"]
-model_1 <- lm(data = df, ba ~ .)
-summary(model_1)
-
-X_series <- as.matrix(cbind(1, df[, stocks]), ncol = k)
-y_series <- as.matrix(df[, "ba"], ncol = k)
-n_T <- horizon <- nrow(df)
-k <- length(selection)
-
-# Gibbs sampler ====
-
-# Initialize 
-b_10 <- matrix(c(model_1$coefficients), nrow = k) 
-S_10 <- h_0 <- 1.5  
-N_10 <- (1/1000000) * diag(k) 
-Q <- diag(k)
-S0_inv <-  k * solve(t(X_series) %*% X_series)
-C_inv <-  diag(k)
-b <- rep((1/k), k)
-d <- 1 
-e <- 1
-alpha <- 1/200
-lambda <- 0.99 
-nu <- 100 
-
-n_gibbs <- 1000
-density_lambda <- h0_mcmc <- lambda_mcmc <- nu_mcmc <- matrix(0, nrow = n_gibbs)
-beta_mcmc <-  array(0, dim = c(n_max, k, n_gibbs))
-Q_mcmc <- array(0, dim = c(k, k, n_gibbs))
-h_mcmc <- array(0, dim = c(n_max, ncol = 1, n_gibbs))
-
-start <- Sys.time()
-
-for (i in 1:n_gibbs){
-  print(i)
-  # FFBS in states 
-  result_filter <- filter_forward(X = X_series, y = y_series, nu = nu, Q = Q, 
-                                  lambda = lambda, N_10 = N_10, S_10 = S_10, 
-                                  b_10 = b_10, n_T = n_T, k = k) 
-  result_bsample <- backward_sample(S_m = result_filter$S_m, 
-                                    b_m = result_filter$beta_m, 
-                                    N_m = result_filter$N_m, nu = nu, Q = Q, 
-                                    lambda = lambda, n_T = n_T, k = k)
-  beta_mcmc[ , , i] <- result_bsample[ , 2:(k + 1)]
-  h_mcmc[ , , i]    <- result_bsample[ , 1]
-  print("success FFBS")
-  # Q 
-  N_10 <- Q <- Q_mcmc[, , i] <- sample_Q(beta_0 = b_10, theta = result_bsample, 
-                                         n_T = n_T, k = k, S0_inv = S0_inv)
-  print("success Q")
-  h_1 <- drop(result_bsample[1, 1])
-  h_T <- drop(result_bsample[n_T, 1])
-  beta_1 <- matrix(result_bsample[1, 2:(k+1)],nrow = k)
-  # nu 
-  nu_log <- logp_nu(nu = nu, h_T = h_T, h_0 = h_0, k = k, lambda = lambda, 
-                    n_T = n_T, alpha = alpha)
-  nu_mcmc[i, 1] <- nu <- nu_sample(nu_old = nu, logdensity_old = nu_log, 
-                                   sd = 10, h_T = h_T, 
-                                   h_0 = h_0, k = k, lambda = lambda, n_T = n_T,
-                                   alpha = alpha)
-  print("success nu")
-  # lambda
-  density_lambda[i, 1] <- logdensity_lambda <- logp_lambda(lambda, nu = nu, 
-                                   h = result_bsample[, 1, drop = F], 
-                                   h_0 = h_0, k = k, n_T = n_T)
- lambda <-  0.99 # lambda_mcmc[i, 1] <- (nu/(nu+1))  # sample_lambda(lambda, 
- #                                   logdensity_old = logdensity_lambda,
- #                                    sd = 0.00000001, nu = nu, 
- #                                    h = result_bsample[, 1, drop = F], 
- #                                    h_0 = h_0, k = k, n_T = n_T)
-  print("success lambda")
-  # beta_0 
-  b_10 <- beta_0_sample(C_inv = C_inv, h_1 = h_1, Q = Q, beta_1 = beta_1, b = b)
-  print("success b_10")
-  # h_0 
-  log_h0 <- logp_h_0(h_0 = h_0, h_1 = h_1, lambda = lambda, nu = nu, k = k, 
-                     d = d, e = e)
-  h0_mcmc[i, 1] <- S_10 <- h_0 <- h_0_sample(h0_old = h_0, 
-                                             logdensity_old = log_h0, 
-                         sd = 0.5, h_1 = h_1, nu = nu, k = k, d = d, e = e)
-}
-end <- Sys.time()
-duration <- end - start 
-duration
+  set.seed(123)
+  rm(list = ls())
+  source("helpers_kmu.R")
+  source("helpers_general.R")
+  
+  load("returns.Rda")
+  n_max <- 2000 #nrow(returns)
+  mcoptions <- list(preschedule = FALSE, set.seed= TRUE)
+  
+  # Prepping ====
+  selection <- c("ba", "hd", "ko", "jpm", "ibm")
+  selection <- c(setdiff(names(returns), "date")) 
+  baseline <- "ba"
+  df <- returns[1:n_max, names(returns) %in% selection]
+  stocks <- c(setdiff(selection, "ba"))
+  df[1:n_max, stocks] <- - returns[1:n_max, stocks] + returns[1:n_max, "ba"]
+  model_1 <- lm(data = df, ba ~ .)
+  summary(model_1)
+  
+  X_series <- as.matrix(cbind(1, df[, stocks]), ncol = k)
+  y_series <- as.matrix(df[, "ba"], ncol = k)
+  n_T <- horizon <- nrow(df)
+  k <- length(selection)
+  
+  # Gibbs sampler ====
+  
+  # Initialize 
+  b_10 <- matrix(c(model_1$coefficients), nrow = k) 
+  S_10 <- h_0 <- 1.5  
+  N_10 <- (1/1000000) * diag(k) 
+  Q <- diag(k)
+  S0_inv <-  k * solve(t(X_series) %*% X_series)
+  C_inv <-  diag(k)
+  b <- rep((1/k), k)
+  d <- 1 
+  e <- 1
+  alpha <- 1/200
+  lambda <- 0.99 
+  nu <- 100 
+  
+  n_gibbs <- 1000
+  density_lambda <- h0_mcmc <- lambda_mcmc <- nu_mcmc <- matrix(0, nrow = n_gibbs)
+  beta_mcmc <-  array(0, dim = c(n_max, k, n_gibbs))
+  Q_mcmc <- array(0, dim = c(k, k, n_gibbs))
+  h_mcmc <- array(0, dim = c(n_max, ncol = 1, n_gibbs))
+  
+  start <- Sys.time()
+  
+  for (i in 1:n_gibbs){
+    print(i)
+    # FFBS in states 
+    result_filter <- filter_forward(X = X_series, y = y_series, nu = nu, Q = Q, 
+                                    lambda = lambda, N_10 = N_10, S_10 = S_10, 
+                                    b_10 = b_10, n_T = n_T, k = k) 
+    result_bsample <- backward_sample(S_m = result_filter$S_m, 
+                                      b_m = result_filter$beta_m, 
+                                      N_m = result_filter$N_m, nu = nu, Q = Q, 
+                                      lambda = lambda, n_T = n_T, k = k)
+    beta_mcmc[ , , i] <- result_bsample[ , 2:(k + 1)]
+    h_mcmc[ , , i]    <- result_bsample[ , 1]
+    print("success FFBS")
+    # Q N_10 <- 
+    Q <- Q_mcmc[, , i] <- sample_Q(beta_0 = b_10, theta = result_bsample, 
+                                           n_T = n_T, k = k, S0_inv = S0_inv)
+    print("success Q")
+    h_1 <- drop(result_bsample[1, 1])
+    h_T <- drop(result_bsample[n_T, 1])
+    beta_1 <- matrix(result_bsample[1, 2:(k+1)],nrow = k)
+    # nu 
+    nu_log <- logp_nu(nu = nu, h_T = h_T, h_0 = h_0, k = k, lambda = lambda, 
+                      n_T = n_T, alpha = alpha)
+    nu_mcmc[i, 1] <- nu <- nu_sample(nu_old = nu, logdensity_old = nu_log, 
+                                     sd = 10, h_T = h_T, 
+                                     h_0 = h_0, k = k, lambda = lambda, n_T = n_T,
+                                     alpha = alpha)
+    print("success nu")
+    # lambda
+    density_lambda[i, 1] <- logdensity_lambda <- logp_lambda(lambda, nu = nu, 
+                                     h = result_bsample[, 1, drop = F], 
+                                     h_0 = h_0, k = k, n_T = n_T)
+   lambda <-  0.99 # lambda_mcmc[i, 1] <- (nu/(nu+1))  # sample_lambda(lambda, 
+   #                                   logdensity_old = logdensity_lambda,
+   #                                    sd = 0.00000001, nu = nu, 
+   #                                    h = result_bsample[, 1, drop = F], 
+   #                                    h_0 = h_0, k = k, n_T = n_T)
+    print("success lambda")
+    # beta_0 
+    b_10 <- beta_0_sample(C_inv = C_inv, h_1 = h_1, Q = Q, beta_1 = beta_1, b = b)
+    print("success b_10")
+    # h_0 
+    log_h0 <- logp_h_0(h_0 = h_0, h_1 = h_1, lambda = lambda, nu = nu, k = k, 
+                       d = d, e = e)
+    h0_mcmc[i, 1] <- S_10 <- h_0 <- h_0_sample(h0_old = h_0, 
+                                               logdensity_old = log_h0, 
+                           sd = 0.5, h_1 = h_1, nu = nu, k = k, d = d, e = e)
+  }
+  end <- Sys.time()
+  duration <- end - start 
+  duration
 
 # Performance ====
 beta_result <- apply(beta_mcmc[, ,(n_gibbs * 0.5):(n_gibbs)], c(1, 2), mean)
