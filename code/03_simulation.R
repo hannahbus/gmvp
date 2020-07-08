@@ -6,7 +6,7 @@
 # Short description: This program tests the forward-filter and backward sampling  
 # algorithm for simulated data. 
 
-setwd("~/Desktop/bayesian-gmvp/Computation/") 
+setwd("gmvp/code/")
 
 library(stats)      # Gamma, Wishart
 library(MASS)       # MVNORM
@@ -19,7 +19,7 @@ library(doParallel) # Parallel Computing. Requires foreach, iterators, parallel
 rm(list = ls())
 source("helpers_kmu.R")
 source("helpers_general.R")
-source("simulation_kmu.R")
+source("simulate_kmu.R")
 set.seed(345)
 
 # Simulate data. ====
