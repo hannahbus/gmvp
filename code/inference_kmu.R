@@ -21,12 +21,12 @@ setwd("~/Desktop/bayesian-gmvp/Computation/")
   source("helpers_general.R")
   
   load("returns.Rda")
-  n_max <- 2000 #nrow(returns)
+  n_max <- 3000 #nrow(returns)
   mcoptions <- list(preschedule = FALSE, set.seed= TRUE)
   
   # Prepping ====
   selection <- c("ba", "hd", "ko", "jpm", "ibm")
-  selection <- c(setdiff(names(returns), "date")) 
+  #selection <- c(setdiff(names(returns), "date")) 
   baseline <- "ba"
   df <- returns[1:n_max, names(returns) %in% selection]
   stocks <- c(setdiff(selection, "ba"))
@@ -55,7 +55,7 @@ setwd("~/Desktop/bayesian-gmvp/Computation/")
   lambda <- 0.99 
   nu <- 100 
   
-  n_gibbs <- 1000
+  n_gibbs <- 10000
   density_lambda <- h0_mcmc <- lambda_mcmc <- nu_mcmc <- matrix(0, nrow = n_gibbs)
   beta_mcmc <-  array(0, dim = c(n_max, k, n_gibbs))
   Q_mcmc <- array(0, dim = c(k, k, n_gibbs))
