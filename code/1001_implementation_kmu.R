@@ -15,26 +15,28 @@ library(plotly)
 
 setwd("~/Desktop/bayesian-gmvp/Computation/")
 
+set.seed(123)
 rm(list = ls())
 source("helpers_kmu.R")
 source("helpers_general.R")
 
 load("returns.Rda")
-n_max <- 2000
+n_max <- 1000 #nrow(returns)
 mcoptions <- list(preschedule = FALSE, set.seed= TRUE)
 
 # Prepping ====
-selection <- c("ba", "hd", "ko", "jpm", "ibm")
+# selection <- c("ba", "hd", "ko", "jpm", "ibm")
 # selection <- c(setdiff(names(returns), "date")) 
-baseline <- "ba"
+selection <- c("ms", "axp", "c", "bac", "jpm")
+baseline <- "ms"
 df <- returns[1:n_max, names(returns) %in% selection]
-stocks <- c(setdiff(selection, "ba"))
-df[1:n_max, stocks] <- - returns[1:n_max, stocks] + returns[1:n_max, "ba"]
-model_1 <- lm(data = df, ba ~ .)
+stocks <- c(setdiff(selection, baseline))
+df[1:n_max, stocks] <- - returns[1:n_max, stocks] + returns[1:n_max, baseline]
+model_1 <- lm(data = df, ms ~ .)
 summary(model_1)
 
 X_series <- as.matrix(cbind(1, df[, stocks]), ncol = k)
-y_series <- as.matrix(df[, "ba"], ncol = k)
+y_series <- as.matrix(df[, baseline], ncol = k)
 n_T <- horizon <- nrow(df)
 k <- length(selection)
 
@@ -43,20 +45,19 @@ k <- length(selection)
 # Initialize 
 b_10 <- matrix(c(model_1$coefficients), nrow = k) 
 S_10 <- h_0 <- 1.5  
-N_10 <- Q <- diag(k) 
-nu <- 100 
-lambda <- nu / (nu + 1)
+N_10 <- (1/1000000) * diag(k) 
+Q <- diag(k)
 S0_inv <-  k * solve(t(X_series) %*% X_series)
 C_inv <-  diag(k)
 b <- rep((1/k), k)
 d <- 1 
 e <- 1
 alpha <- 1/200
-lambda <- 0.98 
-nu <- 50 
+lambda <- 0.99 
+nu <- 100 
 
-n_gibbs <- 1000
-density_lambda <- h0_mcmc <- lambda_mcmc <- nu_mcmc <- matrix(0, nrow  = n_gibbs)
+n_gibbs <- 5000
+density_lambda <- h0_mcmc <- lambda_mcmc <- nu_mcmc <- matrix(0, nrow = n_gibbs)
 beta_mcmc <-  array(0, dim = c(n_max, k, n_gibbs))
 Q_mcmc <- array(0, dim = c(k, k, n_gibbs))
 h_mcmc <- array(0, dim = c(n_max, ncol = 1, n_gibbs))
@@ -95,14 +96,14 @@ for (i in 1:n_gibbs){
   density_lambda[i, 1] <- logdensity_lambda <- logp_lambda(lambda, nu = nu, 
                                    h = result_bsample[, 1, drop = F], 
                                    h_0 = h_0, k = k, n_T = n_T)
-  lambda <- lambda_mcmc[i, 1] <- sample_lambda(lambda, 
-                                    logdensity_old = logdensity_lambda,
-                                     sd = 0.00000001, nu = nu, 
-                                     h = result_bsample[, 1, drop = F], 
-                                     h_0 = h_0, k = k, n_T = n_T)
+ lambda <-  0.99 # lambda_mcmc[i, 1] <- (nu/(nu+1))  # sample_lambda(lambda, 
+ #                                   logdensity_old = logdensity_lambda,
+ #                                    sd = 0.00000001, nu = nu, 
+ #                                    h = result_bsample[, 1, drop = F], 
+ #                                    h_0 = h_0, k = k, n_T = n_T)
   print("success lambda")
   # beta_0 
-  b_10 <- beta_0_sample(C_inv = C_inv, h_1= h_1, Q = Q, beta_1 = beta_1, b = b)
+  b_10 <- beta_0_sample(C_inv = C_inv, h_1 = h_1, Q = Q, beta_1 = beta_1, b = b)
   print("success b_10")
   # h_0 
   log_h0 <- logp_h_0(h_0 = h_0, h_1 = h_1, lambda = lambda, nu = nu, k = k, 
@@ -125,7 +126,7 @@ performance_1
 performance_2
 
 # Sanity check 
-beta_variance <- apply(beta_mcmc[], c(1, 2), var)
+beta_variance <- apply(beta_mcmc[, ,(n_gibbs * 0.5):(n_gibbs)], c(1, 2), var)
 plot_ly(x = paste("beta", 0:(5-1), sep = "_"),
         y = returns$date, z = beta_variance, type = "heatmap", 
         colors = colorRamp(c("white", "black")))
@@ -175,8 +176,17 @@ mean(beta_mcmc[682,44, ])
 mean(beta_mcmc[11,3,])
 var(beta_mcmc[11,3,])
 
-plot(1:n_gibbs, h_mcmc[2000,1, ], "l")
+plot(1:(0.5 * n_gibbs + 1), h_mcmc[1000,1, (0.5 * n_gibbs):n_gibbs], "l")
+
 plot(1:39, beta_mcmc[2,1, 1:39], "l")
-plot(1:n_gibbs, beta_mcmc[300,2, ], "l")
-plot(1:n_gibbs, beta_mcmc[500, ], "l")
+plot(1:(0.5 * n_gibbs + 1), beta_mcmc[300,2, (0.5 * n_gibbs):n_gibbs], "l")
+plot(1:(0.5 * n_gibbs + 1), beta_mcmc[200,4, (0.5 * n_gibbs):n_gibbs], "l")
 View(density_lambda)
+
+conditioning_check <- apply(Q_mcmc, c(3), function(x){kappa(solve(x))})
+plot(1:n_gibbs, conditioning_check, "l")
+View(conditioning_check)  
+# Some cursory analysis 
+
+sum(is.na(density_lambda)) / n_gibbs
+length(unique(lambda_mcmc)) / n_gibbs

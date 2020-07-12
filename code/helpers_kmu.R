@@ -17,22 +17,22 @@ predict <- function(beta_m, N_m, nu, S_m, lambda, Q){
   return(list(beta_p, N_p, S_p))
 }
 
-filter_forward <- function(X, y, nu, Q, 
-                           lambda, N_10, S_10, b_10, n_T, k){ 
+filter_forward <- function(X, y, nu, Q, lambda, N_0_0, S_0_0, b_0_0, n_T, k){ 
   # Initialize. 
   S_m <- matrix(0, nrow = n_T, ncol = 1)
   S_p <- matrix(0, nrow = 1, ncol = 1) 
   b_m <- matrix(0, nrow = k, ncol = n_T)
   b_p <- matrix(0, nrow = k, ncol = 1)
   N_m <- array(0, dim = c(k, k, n_T))
-  N_p  <- N_10
-  b_p[, 1]  <- b_10
-  S_p[1, 1] <- S_10
+  result_p <- predict(beta_m =b_0_0, N_m = N_0_0, nu = nu, S_m = S_0_0, 
+                      lambda = lambda, Q = Q)
+  b_p  <- result_p[[1]]
+  N_p  <- result_p[[2]]
+  S_p  <- result_p[[3]]
   for (i in 1:n_T){ 
     # Measure.
     result_m <- measure(beta_p = b_p, N_p = N_p, S_p = S_p, 
-                        X = X[i, , drop = FALSE], 
-                        y = y[i, 1], k = k, nu = nu)
+                        X = X[i, , drop = F], y = y[i, 1], k = k, nu = nu)
     b_m[, i] <- result_m[[1]]
     N_m[, , i] <- result_m[[2]]
     S_m[i, 1] <- result_m[[3]] 
@@ -51,7 +51,7 @@ filter_forward <- function(X, y, nu, Q,
 
 backward_sample <- function(S_m, b_m, N_m, nu, Q, lambda, n_T, k){ 
   # Initialize result vectors. 
-  b_mT = b_m[, n_T, drop = FALSE]
+  b_mT = b_m[, n_T, drop = F]
   N_mT = N_m[, , n_T]
   beta  = matrix(nrow = n_T, ncol = k)
   h = matrix(nrow = n_T, ncol = 1)
@@ -71,7 +71,7 @@ backward_sample <- function(S_m, b_m, N_m, nu, Q, lambda, n_T, k){
 }
 
 backwardsample_it <- function(D, S_m, b_m, N_m, nu, Q, lambda, n_T, k,  
-                  mcoptions = list(preschedule=FALSE, set.seed= TRUE)){
+                  mcoptions = list(preschedule = F, set.seed= T)){
   gibbs_result <- foreach(icount(D), .options.multicore=mcoptions) %dopar% { 
                       backward_sample(S_m, b_m, N_m, nu, Q, lambda, n_T, k)
                       }
@@ -93,7 +93,7 @@ compute_G <- function(beta_0, theta, n_T, k){
   beta_tilde <- beta - beta_lag 
   G <- matrix(0, ncol = k, nrow = k)
   for (i in 1:n_T){
-    G <- G + h[i] * beta_tilde[, i] %*% t(beta_tilde[, i])
+   G <- G + h[i] * beta_tilde[, i] %*% t(beta_tilde[, i])
   }
   if (!isSymmetric(G)){
     warning("A non-symmetric matrix was generated.")
@@ -190,9 +190,7 @@ logp_lambda <- function(lambda, nu, h, h_0, k, n_T){
     return(NA)
   } else if (lambda <= 0) {
      return(NA)
-  } else if (lambda > 1) { 
-    return(NA) 
-    } else if (sum((1 - lambda * ratio) < 0) == 0) {
+  } else if (sum((1 - lambda * ratio) < 0) == 0) {
     logp_lambda = n_T * (nu + k) * 0.5 * log(lambda) -  
                   0.5 * sum(log(1 - lambda * ratio))
     return(logp_lambda)
