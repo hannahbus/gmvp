@@ -249,7 +249,7 @@ kmu_is <- function(returns, n_T, selection, baseline, stocks, k, Q, N_0,
 
 analysis_is_performance <- function(result, n_gibbs, burn_factor, returns, 
                                     choice, plot = F){
-  beta_result <- apply(beta_mcmc[, ,(n_gibbs * burn_factor + 1):(n_gibbs)], 
+  beta_result <- apply(result[, ,(n_gibbs * burn_factor + 1):(n_gibbs)], 
                        c(1, 2), mean)
   performance <- compute_performance_is(beta = beta_result, k = k, 
                                         returns = returns)
