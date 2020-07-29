@@ -191,7 +191,7 @@ sample_lambda <- function(lambda_old, logdensity_old, sd, nu, h, h_0, k, n_T){
 
 kmu_is <- function(returns, n_T, selection, baseline, stocks, k, Q, N_0, 
                    alpha, lambda, nu, n_gibbs, burn_factor,
-                   nu_fix = F){
+                   nu_fix = F, sd = 10){
   df_is <- - returns[1:n_T, stocks] + returns[1:n_T, baseline]
   df_is[, "baseline"] <- returns[1:n_T, baseline]
   model_1 <- lm(data = df_is, baseline ~ .)
@@ -231,7 +231,7 @@ kmu_is <- function(returns, n_T, selection, baseline, stocks, k, Q, N_0,
                         k = k, lambda = lambda, n_T = n_T, alpha = alpha, 
                         S_0 = S_0)
       nu_mcmc[i, 1] <- nu <- nu_sample(nu_old = nu, logdensity_old = nu_log, 
-                                       sd = 10, h_T = h_T, 
+                                       sd = sd, h_T = h_T, 
                                        h_0 = h_0, S_0 = S_0, 
                                        k = k, lambda = lambda, 
                                        n_T = n_T,
@@ -283,10 +283,9 @@ analysis_is_performance <- function(result, n_gibbs, burn_factor, returns,
 
 # OS Experiment ====
 
-kmu_os <- function(N, n_min, window, n_gibbs, burn, 
-                                  returns, baseline, stocks, selection,
-                                  k, Q, C_inv, b, d, e, alpha, lambda, 
-                                  nu){
+kmu_os <- function(N, n_min, window, n_gibbs, burn, returns, 
+                   baseline, stocks, selection, k, Q, alpha, 
+                   lambda, nu, N_0){
   rounds <- floor((N - n_min) / window)  
   # Initialize objects 
   h0_mcmc <- nu_mcmc <- S_T_mcmc <- matrix(0, ncol = 1, nrow = (n_gibbs))
@@ -317,7 +316,7 @@ kmu_os <- function(N, n_min, window, n_gibbs, burn,
     model_1 <- lm(data = df_is, baseline ~ .)
     b_10 <- matrix(c(model_1$coefficients), nrow = k) 
     h_0 <- 1 / sum((df_is$baseline - model_1$fitted.values)^2) / (n_min - k)
-    S_10  <- lambda * (nu + 1) / nu * (1 / h_0) 
+    S_0 <- S_10  <- (1 / h_0) 
     X_series <- as.matrix(cbind(1, df_is[, stocks]), ncol = k)
     y_series <- as.matrix(df_is[, "baseline"], ncol = k)
     remove(model_1)
@@ -331,36 +330,28 @@ kmu_os <- function(N, n_min, window, n_gibbs, burn,
       result_bsample <- backward_sample(S_m = result_filter$S_m, 
                                         b_m = result_filter$beta_m, 
                                         N_m = result_filter$N_m, nu = nu, Q = Q, 
-                                        lambda = lambda, n_T = n_min, k = k)
-      beta_mcmc[ , , i] <- result_bsample[ , 2:(k + 1)]
-      h_mcmc[ , , i]    <- result_bsample[ , 1]
-      h_1 <- drop(result_bsample[1, 1])
-      h_T <- drop(result_bsample[n_min, 1])
-      beta_1 <- matrix(result_bsample[1, 2:(k+1)],nrow = k)
-      h_0_help <- lambda * h_1 + rgamma(1, shape = 0.5, 
-                                        scale = 2 / ((nu + 1) * S_10))
+                                        lambda = lambda, n_T = n_min, k = k, 
+                                        S_0 = S_0, N_0 = N_0, b_0 = b_10)
+      beta_mcmc[ , , i] <- result_bsample$beta_series
+      h_mcmc[ , , i]    <- result_bsample$h_series
+      h_1 <- drop(h_mcmc[1, 1, i])
+      h_T <- drop(h_mcmc[n_min, 1, i])
+      h_0 <- result_bsample$h_0
       # nu 
-      nu_log <- logp_nu(nu = nu, h_T = h_T, h_0 = h_0_help, k = k, 
+      nu_log <- logp_nu(nu = nu, h_T = h_T, h_0 = h_0, S_0 = S_0, k = k, 
                         lambda = lambda, 
                         n_T = n_min, alpha = alpha)
-      nu_mcmc[i, 1] <- nu <- nu_sample(nu_old = nu, logdensity_old = nu_log, 
+      nu_mcmc[i, 1] <- nu <- nu_sample(nu_old = nu, 
+                                       logdensity_old = nu_log, 
                                        sd = 10, h_T = h_T, 
-                                       h_0 = h_0_help, k = k, lambda = lambda, 
+                                       h_0 = h_0, S_0 = S_0,
+                                       k = k, 
+                                       lambda = lambda, 
                                        n_T = n_min,
                                        alpha = alpha)
-      # beta_0 
-      b_10 <- beta_0_sample(C_inv = C_inv, h_1 = h_1, Q = Q, beta_1 = beta_1, 
-                            b = b)
-      # h_0 
-      log_h0 <- logp_h_0(h_0 = h_0_help, h_1 = h_1, lambda = lambda, nu = nu, 
-                         k = k, d = d, e = e)
-      h0_mcmc[i, 1] <- h_0 <- h_0_sample(h0_old = h_0_help, 
-                                         logdensity_old = log_h0, 
-                                         sd = 0.5, h_1 = h_1, nu = nu, k = k, 
-                                         d = d, e = e)
-      S_10 <- (1 / h_0) * lambda * (nu + 1) / nu
+      S_10 <- lambda * ((nu + 1) / nu) * S_0
       N_T_mcmc[, , i] <- result_filter$N_m[, , n_min, drop = T]
-      S_T_mcmc[i, 1] <- result_filter$S_m[n_min, 1]
+      S_T_mcmc[i, 1]  <- result_filter$S_m[n_min, 1]
     }
     beta_result <- apply(beta_mcmc[, ,(n_gibbs - burn + 1):(n_gibbs)], c(1, 2), 
                          mean)
